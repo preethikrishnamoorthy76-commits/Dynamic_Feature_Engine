@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic Feature Execution Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4efe4;
+      --ink: #1f1f24;
+      --panel: #fffdf9;
+      --accent: #e95f37;
+      --accent-soft: #f9d9cc;
+      --ok: #0d9966;
+      --muted: #66656d;
+      --line: #dfd9cc;
+      --shadow: 0 12px 32px rgba(35, 25, 16, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, #ffd6be 0%, transparent 35%),
+        radial-gradient(circle at 90% 20%, #ffeaba 0%, transparent 30%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      animation: rise 0.55s ease-out;
+    }
+
+    @keyframes rise {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.8rem, 3vw, 2.7rem);
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 1.1rem;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    label {
+      font-weight: 500;
+      font-size: 0.92rem;
+    }
+
+    input {
+      font-family: "IBM Plex Mono", monospace;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.94rem;
+      width: 100%;
+      background: #fff;
+    }
+
+    .checks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.92rem;
+      padding: 8px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: inherit;
+    }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+    }
+
+    pre {
+      margin: 0;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #2b2b30;
+    }
+
+    .waves {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+    }
+
+    .wave {
+      background: var(--accent-soft);
+      border: 1px solid #efbdad;
+      border-radius: 10px;
+      padding: 6px 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+    }
+
+    .metric {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.85rem;
+      margin: 4px 0;
+    }
+
+    #graph-wrap {
+      position: relative;
+    }
+    #graph-controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    #graph-controls button {
+      padding: 4px 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f4f4f4;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    #graph-controls button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    #graph {
+      width: 100%;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      background: #fff;
+      overflow: auto;
+      box-sizing: border-box;
+    }
+    #graph.fullscreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      border-radius: 0;
+      padding: 32px;
+    }
+    #graph svg {
+      display: block;
+      /* natural size set via JS; never constrained by CSS */
+    }
+
+    .ok { color: var(--ok); }
+    .error { color: #b21818; }
+
+    @media (max-width: 920px) {
+      .grid, .results-grid { grid-template-columns: 1fr; }
+      body { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>Dynamic Feature Execution Engine</h1>
+    <p class="sub">Run multiple ML models at once, resolve dependencies, execute feature waves in parallel, and compare speedup.</p>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Input</h2>
+        <div class="field">
+          <label for="user_age">User Age</label>
+          <input id="user_age" type="number" value="34" min="1" />
+        </div>
+        <div class="field">
+          <label for="product_price">Product Price</label>
+          <input id="product_price" type="number" value="149.99" step="0.01" min="1" />
+        </div>
+        <div class="field">
+          <label for="transaction_history">Transaction History (comma-separated)</label>
+          <input id="transaction_history" type="text" value="23.5,67.0,145.2,89.0" />
+        </div>
+        <div class="field">
+          <label for="device_fingerprint">Device Fingerprint</label>
+          <input id="device_fingerprint" type="text" value="abc123xyz" />
+        </div>
+
+        <h2>Models</h2>
+        <div class="checks">
+          <label class="check-item"><input type="checkbox" value="fraud" checked />Fraud</label>
+          <label class="check-item"><input type="checkbox" value="pricing" checked />Pricing</label>
+          <label class="check-item"><input type="checkbox" value="churn" checked />Churn</label>
+          <label class="check-item"><input type="checkbox" value="recommendation" checked />Recommendation</label>
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary" id="runBtn">Run Execute</button>
+          <button class="btn-secondary" id="compareBtn">Run Comparison</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Status</h2>
+        <p id="status" class="metric">Idle</p>
+
+        <h2>Execution Plan</h2>
+        <div id="waves" class="waves"></div>
+
+        <h2>Metrics</h2>
+        <div id="metrics"></div>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top: 18px;">
+      <h2>Results</h2>
+      <div id="results" class="results-grid"></div>
+    </section>
+
+    <section class="panel" style="margin-top: 18px;">
+      <h2>Feature Dependency Graph</h2>
+      <p class="sub" style="margin-bottom: 10px;">Raw inputs and derived features rendered from the backend graph endpoint.</p>
+      <div id="graph-wrap">
+        <div id="graph-controls">
+          <button id="zoomInBtn">＋ Zoom In</button>
+          <button id="zoomOutBtn">－ Zoom Out</button>
+          <button id="zoomResetBtn">↺ Reset</button>
+          <button id="fullscreenBtn">⛶ Fullscreen</button>
+        </div>
+        <div id="graph"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const wavesEl = document.getElementById("waves");
+    const metricsEl = document.getElementById("metrics");
+    const resultsEl = document.getElementById("results");
+    const graphEl = document.getElementById("graph");
+    const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+
+    mermaid.initialize({ startOnLoad: false, theme: "base" });
+
+    function selectedModels() {
+      return Array.from(document.querySelectorAll("input[type='checkbox']:checked")).map((el) => el.value);
+    }
+
+    function readInputData() {
+      const txRaw = document.getElementById("transaction_history").value;
+      const tx = txRaw.split(",").map((v) => Number(v.trim())).filter((v) => !Number.isNaN(v));
+      return {
+        user_age: Number(document.getElementById("user_age").value),
+        product_price: Number(document.getElementById("product_price").value),
+        transaction_history: tx,
+        device_fingerprint: document.getElementById("device_fingerprint").value.trim(),
+      };
+    }
+
+    function renderResults(results) {
+      resultsEl.innerHTML = "";
+      Object.entries(results).forEach(([modelName, payload], idx) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.style.animation = `rise 0.35s ease-out ${idx * 0.04}s both`;
+        card.innerHTML = `<h3>${modelName}</h3><pre>${JSON.stringify(payload, null, 2)}</pre>`;
+        resultsEl.appendChild(card);
+      });
+    }
+
+    function renderWaves(waves) {
+      wavesEl.innerHTML = "";
+      waves.forEach((wave, i) => {
+        const el = document.createElement("div");
+        el.className = "wave";
+        el.textContent = `Wave ${i + 1}: ${wave.join(", ")}`;
+        wavesEl.appendChild(el);
+      });
+    }
+
+    function renderMetrics(metrics, extra = {}) {
+      metricsEl.innerHTML = "";
+      const all = { ...metrics, ...extra };
+      Object.entries(all).forEach(([k, v]) => {
+        const div = document.createElement("div");
+        div.className = "metric";
+        div.textContent = `${k}: ${v}`;
+        metricsEl.appendChild(div);
+      });
+    }
+
+    async function callApi(path, payload) {
+      const response = await fetch(`${apiBase}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    let graphZoom = 1.0;
+    let svgNaturalW = 1400;
+    let svgNaturalH = 800;
+
+    function applyZoom() {
+      const svgEl = graphEl.querySelector("svg");
+      if (!svgEl) return;
+      // At zoom=1 fill the container width so height grows proportionally.
+      const containerW = graphEl.clientWidth - 32; // subtract padding
+      const baseW = Math.max(containerW, svgNaturalW);
+      const w = Math.round(baseW * graphZoom);
+      const h = Math.round(w * (svgNaturalH / svgNaturalW));
+      svgEl.setAttribute("width", w + "px");
+      svgEl.setAttribute("height", h + "px");
+    }
+
+    document.getElementById("zoomInBtn").addEventListener("click", () => { graphZoom = Math.min(graphZoom + 0.25, 5); applyZoom(); });
+    document.getElementById("zoomOutBtn").addEventListener("click", () => { graphZoom = Math.max(graphZoom - 0.25, 0.25); applyZoom(); });
+    document.getElementById("zoomResetBtn").addEventListener("click", () => { graphZoom = 1.0; applyZoom(); });
+    document.getElementById("fullscreenBtn").addEventListener("click", () => {
+      const isFs = graphEl.classList.toggle("fullscreen");
+      document.getElementById("fullscreenBtn").textContent = isFs ? "✕ Exit Fullscreen" : "⛶ Fullscreen";
+    });
+
+    async function renderDependencyGraph() {
+      try {
+        const response = await fetch(`${apiBase}/api/graph`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const graph = await response.json();
+        const graphId = `feature-graph-${Date.now()}`;
+        const { svg } = await mermaid.render(graphId, graph.mermaid);
+        graphEl.innerHTML = svg;
+
+        // Strip Mermaid's inline style="max-width:..." which overrides all CSS
+        const svgEl = graphEl.querySelector("svg");
+        if (svgEl) {
+          svgEl.removeAttribute("style");
+          // Read natural dimensions from viewBox so zoom is proportional
+          const vb = svgEl.getAttribute("viewBox");
+          if (vb) {
+            const parts = vb.trim().split(/[\s,]+/).map(Number);
+            if (parts.length === 4) {
+              svgNaturalW = parts[2] || 1400;
+              svgNaturalH = parts[3] || 800;
+            }
+          }
+          // Start at 1× — fits node labels clearly; container scrolls for wide graphs
+          graphZoom = 1.0;
+          applyZoom();
+        }
+      } catch (err) {
+        graphEl.innerHTML = `<div class="metric error">Graph render failed: ${err.message}. Ensure FastAPI is running on http://127.0.0.1:8000.</div>`;
+      }
+    }
+
+    document.getElementById("runBtn").addEventListener("click", async () => {
+      try {
+        statusEl.className = "metric";
+        statusEl.textContent = "Running /api/execute...";
+        const payload = { models: selectedModels(), input_data: readInputData() };
+        const data = await callApi("/api/execute", payload);
+        renderResults(data.results);
+        renderWaves(data.execution_plan.waves);
+        renderMetrics(data.metrics, {
+          total_features_computed: data.execution_plan.total_features_computed,
+          features_reused: data.execution_plan.features_reused,
+        });
+        statusEl.className = "metric ok";
+        statusEl.textContent = "Execution completed";
+      } catch (err) {
+        statusEl.className = "metric error";
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    document.getElementById("compareBtn").addEventListener("click", async () => {
+      try {
+        statusEl.className = "metric";
+        statusEl.textContent = "Running /api/comparison...";
+        const payload = { models: selectedModels(), input_data: readInputData() };
+        const data = await callApi("/api/comparison", payload);
+        renderResults(data.engine_results);
+        renderWaves([]);
+        renderMetrics({
+          engine_time_ms: data.engine_time_ms,
+          sequential_time_ms: data.sequential_time_ms,
+          speedup_factor: data.speedup_factor,
+        });
+        statusEl.className = "metric ok";
+        statusEl.textContent = "Comparison completed";
+      } catch (err) {
+        statusEl.className = "metric error";
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+
+    renderDependencyGraph();
+  </script>
+</body>
+</html>
