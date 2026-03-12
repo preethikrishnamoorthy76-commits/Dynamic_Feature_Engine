@@ -12,6 +12,12 @@ from backend.engine.executor import WaveExecutor
 from backend.features.compute_functions import COMPUTE_FUNCTIONS
 from backend.features.registry import FeatureDefinition, build_feature_registry
 from backend.models import MODEL_FEATURE_REQUIREMENTS, load_models, model_paths_exist
+from backend.runtime_engine import FeatureExecutionEngine
+from backend.runtime_engine.project_adapter import (
+    PROJECT_COMPUTE_FUNCTIONS,
+    PROJECT_FEATURES,
+    PROJECT_MODELS,
+)
 from backend.training.train_all_models import train_and_save_all_models
 
 logger = logging.getLogger(__name__)
@@ -156,6 +162,12 @@ class ComparisonResponse(BaseModel):
 _registry = build_feature_registry()
 _resolver = DependencyResolver(_registry)
 _executor = WaveExecutor(_registry, COMPUTE_FUNCTIONS)
+_runtime_engine = FeatureExecutionEngine(
+    features=PROJECT_FEATURES,
+    models=PROJECT_MODELS,
+    compute_functions=PROJECT_COMPUTE_FUNCTIONS,
+    verbose=False,
+)
 _models: Dict[str, Any] = {}
 _last_execution_metrics: ObservabilityMetrics | None = None
 
@@ -360,10 +372,16 @@ def execute_models(payload: ExecuteRequest) -> ExecuteResponse:
         raise HTTPException(status_code=400, detail="At least one model must be selected.")
 
     required_union = _compute_required_union(selected_models)
-    waves = _resolver.resolve_waves(required_union)
+    engine_output = _runtime_engine.run(
+        model_ids=selected_models,
+        input_data=payload.input_data.model_dump(),
+    )
+    waves = engine_output["waves"]
     requested_total = sum(len(MODEL_FEATURE_REQUIREMENTS[model_key]) for model_key in selected_models)
 
-    cache, engine_stats, failures = _executor.execute(waves=waves, input_data=payload.input_data.model_dump())
+    cache = engine_output["results"]
+    engine_stats = engine_output["metrics"]
+    failures = engine_output.get("failure_details", {})
 
     results = _predict_with_models(selected_models, cache)
     _, sequential_time_ms, sequential_computed_count = _run_sequential_baseline(
@@ -371,7 +389,7 @@ def execute_models(payload: ExecuteRequest) -> ExecuteResponse:
         input_data=payload.input_data.model_dump(),
     )
 
-    engine_time_ms = float(engine_stats["engine_time_ms"])
+    engine_time_ms = float(engine_stats["total_wall_time_ms"])
     features_reused = max(0, requested_total - len(required_union))
     speedup = float(sequential_time_ms / engine_time_ms) if engine_time_ms > 0 else 0.0
 
@@ -381,7 +399,7 @@ def execute_models(payload: ExecuteRequest) -> ExecuteResponse:
         fastest_feature=engine_stats.get("fastest_feature"),
         slowest_feature=engine_stats.get("slowest_feature"),
         feature_timings={k: float(v) for k, v in engine_stats.get("feature_timings", {}).items()},
-        wave_timings=[WaveTiming(**item) for item in engine_stats.get("wave_timings", [])],
+        wave_timings=[WaveTiming(**item) for item in engine_output.get("wave_timings", [])],
     )
     _last_execution_metrics = observability
 
@@ -389,14 +407,16 @@ def execute_models(payload: ExecuteRequest) -> ExecuteResponse:
         results=results,
         execution_plan=ExecutionPlan(
             waves=waves,
-            total_features_computed=int(engine_stats["computed_count"]),
+            total_features_computed=int(engine_stats["total_features_executed"]),
             features_reused=features_reused,
         ),
         metrics=Metrics(
             engine_time_ms=round(engine_time_ms, 3),
             sequential_time_ms=round(sequential_time_ms, 3),
             speedup_factor=round(speedup, 3),
-            features_saved_from_recompute=max(0, sequential_computed_count - int(engine_stats["computed_count"])),
+            features_saved_from_recompute=max(
+                0, sequential_computed_count - int(engine_stats["total_features_executed"])
+            ),
         ),
         partial_failures=failures,
         observability=observability,
@@ -406,11 +426,12 @@ def execute_models(payload: ExecuteRequest) -> ExecuteResponse:
 @router.post("/comparison", response_model=ComparisonResponse)
 def compare_execution(payload: ExecuteRequest) -> ComparisonResponse:
     selected_models = payload.models
-    required_union = _compute_required_union(selected_models)
-    waves = _resolver.resolve_waves(required_union)
-
     engine_start = time.perf_counter()
-    cache, _, _ = _executor.execute(waves=waves, input_data=payload.input_data.model_dump())
+    engine_output = _runtime_engine.run(
+        model_ids=selected_models,
+        input_data=payload.input_data.model_dump(),
+    )
+    cache = engine_output["results"]
     engine_results = _predict_with_models(selected_models, cache)
     engine_time_ms = (time.perf_counter() - engine_start) * 1000
 

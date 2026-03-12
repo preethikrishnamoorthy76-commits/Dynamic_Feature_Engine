@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -35,3 +36,9 @@ def root() -> FileResponse:
     if not index_path.exists():
         raise FileNotFoundError("frontend/index.html not found")
     return FileResponse(index_path)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> Response:
+    # Return empty favicon response to avoid repetitive 404 log noise.
+    return Response(status_code=204)
