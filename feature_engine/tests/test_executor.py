@@ -18,9 +18,10 @@ def test_executor_computes_features_once() -> None:
         "device_fingerprint": "abc123xyz",
     }
 
-    cache, stats = executor.execute(waves=waves, input_data=input_data)
+    cache, stats, failures = executor.execute(waves=waves, input_data=input_data)
 
     assert "risk_composite_score" in cache
     assert "churn_risk_score" in cache
     assert "final_recommended_price" in cache
+    assert failures == {}
     assert all(count == 1 for count in stats["feature_compute_counts"].values())

@@ -3,21 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dynamic Feature Execution Engine</title>
+  <title>Dynamic Feature Engine Visualizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" />
   <style>
     :root {
-      --bg: #f4efe4;
-      --ink: #1f1f24;
-      --panel: #fffdf9;
-      --accent: #e95f37;
-      --accent-soft: #f9d9cc;
-      --ok: #0d9966;
-      --muted: #66656d;
-      --line: #dfd9cc;
-      --shadow: 0 12px 32px rgba(35, 25, 16, 0.12);
+      --bg: #f5efe5;
+      --panel: #fffdf8;
+      --line: #dfd5c3;
+      --ink: #202125;
+      --muted: #67656c;
+      --accent: #dd623c;
+      --ok: #148f5c;
+      --warn: #e7c547;
+      --fail: #d84f4f;
+      --raw: #f2b263;
+      --derived: #69a8dc;
+      --shadow: 0 10px 30px rgba(50, 39, 20, 0.12);
     }
 
     * { box-sizing: border-box; }
@@ -27,450 +31,486 @@
       font-family: "Space Grotesk", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 10% 10%, #ffd6be 0%, transparent 35%),
-        radial-gradient(circle at 90% 20%, #ffeaba 0%, transparent 30%),
+        radial-gradient(circle at 0% 0%, #ffe0c7 0%, transparent 35%),
+        radial-gradient(circle at 100% 0%, #f9f1c8 0%, transparent 35%),
         var(--bg);
-      min-height: 100vh;
-      padding: 24px;
+      padding: 20px;
     }
 
-    .shell {
-      max-width: 1100px;
-      margin: 0 auto;
-      animation: rise 0.55s ease-out;
-    }
+    .shell { max-width: 1680px; margin: 0 auto; }
 
-    @keyframes rise {
-      from { transform: translateY(16px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
+    h1 { margin: 0 0 6px; font-size: clamp(1.7rem, 2.8vw, 2.5rem); }
+    .sub { margin: 0 0 16px; color: var(--muted); }
 
-    h1 {
-      margin: 0 0 6px;
-      font-size: clamp(1.8rem, 3vw, 2.7rem);
-      letter-spacing: -0.02em;
-    }
-
-    .sub {
-      margin: 0 0 20px;
-      color: var(--muted);
-      font-size: 0.98rem;
-    }
-
-    .grid {
+    .layout {
       display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 18px;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
     }
 
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 16px;
+      padding: 14px;
       box-shadow: var(--shadow);
     }
 
-    .panel h2 {
-      margin: 0 0 12px;
-      font-size: 1.1rem;
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
     }
 
-    .field {
+    .field-grid {
       display: grid;
-      gap: 6px;
-      margin-bottom: 10px;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
+
+    .field { display: grid; gap: 4px; }
 
     label {
+      font-size: 0.82rem;
+      color: #3d3c42;
       font-weight: 500;
-      font-size: 0.92rem;
     }
 
-    input {
-      font-family: "IBM Plex Mono", monospace;
+    input, select {
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 0.94rem;
-      width: 100%;
+      border-radius: 8px;
       background: #fff;
+      padding: 8px;
+      width: 100%;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.82rem;
     }
 
     .checks {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 14px;
+      gap: 8px;
+      margin-top: 10px;
     }
 
-    .check-item {
+    .check {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.92rem;
-      padding: 8px;
-      border-radius: 10px;
-      background: #fff;
+      gap: 6px;
       border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px;
+      background: #fff;
+      font-size: 0.85rem;
     }
 
-    .actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
+    .actions { margin-top: 12px; display: flex; gap: 8px; }
 
     button {
       border: 0;
       border-radius: 999px;
-      padding: 10px 16px;
-      cursor: pointer;
+      padding: 9px 14px;
       font-weight: 700;
+      cursor: pointer;
       font-family: inherit;
     }
 
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+    .primary { background: var(--accent); color: #fff; }
+    .secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
 
-    .results-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+    #waveStatus {
+      margin: 8px 0 0;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.84rem;
+      color: #3e3d44;
     }
 
-    .card {
-      border: 1px solid var(--line);
+    #network {
+      height: 620px;
+      border: 1px dashed var(--line);
       border-radius: 12px;
-      padding: 10px;
       background: #fff;
     }
 
-    .card h3 {
-      margin: 0 0 8px;
-      font-size: 0.95rem;
+    .bottom {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 14px;
     }
 
     pre {
       margin: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
       font-family: "IBM Plex Mono", monospace;
-      font-size: 0.8rem;
+      font-size: 0.79rem;
       white-space: pre-wrap;
       word-break: break-word;
-      color: #2b2b30;
-    }
-
-    .waves {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 8px 0;
-    }
-
-    .wave {
-      background: var(--accent-soft);
-      border: 1px solid #efbdad;
-      border-radius: 10px;
-      padding: 6px 8px;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.8rem;
+      max-height: 340px;
+      overflow: auto;
     }
 
     .metric {
       font-family: "IBM Plex Mono", monospace;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       margin: 4px 0;
     }
 
-    #graph-wrap {
-      position: relative;
-    }
-    #graph-controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
-      flex-wrap: wrap;
-    }
-    #graph-controls button {
-      padding: 4px 14px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #f4f4f4;
-      cursor: pointer;
-      font-size: 0.82rem;
-      font-weight: 600;
-    }
-    #graph-controls button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-    #graph {
-      width: 100%;
-      border: 1px dashed var(--line);
-      border-radius: 12px;
-      padding: 16px;
-      background: #fff;
-      overflow: auto;
-      box-sizing: border-box;
-    }
-    #graph.fullscreen {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      border-radius: 0;
-      padding: 32px;
-    }
-    #graph svg {
-      display: block;
-      /* natural size set via JS; never constrained by CSS */
-    }
-
     .ok { color: var(--ok); }
-    .error { color: #b21818; }
+    .fail { color: var(--fail); }
 
-    @media (max-width: 920px) {
-      .grid, .results-grid { grid-template-columns: 1fr; }
-      body { padding: 14px; }
+    @media (max-width: 1120px) {
+      .layout { grid-template-columns: 1fr; }
+      .bottom { grid-template-columns: 1fr; }
+      #network { height: 520px; }
     }
   </style>
 </head>
 <body>
   <div class="shell">
     <h1>Dynamic Feature Execution Engine</h1>
-    <p class="sub">Run multiple ML models at once, resolve dependencies, execute feature waves in parallel, and compare speedup.</p>
+    <p class="sub">Live wave animation, model outputs, partial failures, and timing comparison.</p>
 
-    <div class="grid">
+    <div class="layout">
       <section class="panel">
-        <h2>Input</h2>
-        <div class="field">
-          <label for="user_age">User Age</label>
-          <input id="user_age" type="number" value="34" min="1" />
-        </div>
-        <div class="field">
-          <label for="product_price">Product Price</label>
-          <input id="product_price" type="number" value="149.99" step="0.01" min="1" />
-        </div>
-        <div class="field">
-          <label for="transaction_history">Transaction History (comma-separated)</label>
-          <input id="transaction_history" type="text" value="23.5,67.0,145.2,89.0" />
-        </div>
-        <div class="field">
-          <label for="device_fingerprint">Device Fingerprint</label>
-          <input id="device_fingerprint" type="text" value="abc123xyz" />
+        <h2>Inputs + Models</h2>
+        <div class="field-grid">
+          <div class="field"><label for="user_age">user_age</label><input id="user_age" type="number" value="29" /></div>
+          <div class="field"><label for="product_price">product_price</label><input id="product_price" type="number" step="0.01" value="1200" /></div>
+          <div class="field"><label for="transaction_history">transaction_history</label><input id="transaction_history" value="150,220,180,210,160,300" /></div>
+          <div class="field"><label for="device_fingerprint">device_fingerprint</label><input id="device_fingerprint" value="abc123xyz" /></div>
+
+          <div class="field"><label for="distance_from_home">distance_from_home</label><input id="distance_from_home" type="number" step="0.1" value="12.5" /></div>
+          <div class="field"><label for="previous_fraud_attempts">previous_fraud_attempts</label><input id="previous_fraud_attempts" type="number" value="0" /></div>
+          <div class="field"><label for="is_night_transaction">is_night_transaction</label><input id="is_night_transaction" type="number" value="0" min="0" max="1" /></div>
+          <div class="field"><label for="card_present">card_present</label><input id="card_present" type="number" value="1" min="0" max="1" /></div>
+          <div class="field"><label for="international_transaction">international_transaction</label><input id="international_transaction" type="number" value="0" min="0" max="1" /></div>
+
+          <div class="field"><label for="tenure_months">tenure_months</label><input id="tenure_months" type="number" value="18" /></div>
+          <div class="field"><label for="last_purchase_days">last_purchase_days</label><input id="last_purchase_days" type="number" value="21" /></div>
+          <div class="field"><label for="support_tickets">support_tickets</label><input id="support_tickets" type="number" value="1" /></div>
+          <div class="field"><label for="complaints">complaints</label><input id="complaints" type="number" value="0" /></div>
+          <div class="field"><label for="discount_used">discount_used</label><input id="discount_used" type="number" value="1" min="0" max="1" /></div>
+          <div class="field"><label for="email_open_rate">email_open_rate</label><input id="email_open_rate" type="number" step="0.01" value="0.42" /></div>
+          <div class="field"><label for="app_visits_per_week">app_visits_per_week</label><input id="app_visits_per_week" type="number" value="6" /></div>
+          <div class="field"><label for="payment_delays">payment_delays</label><input id="payment_delays" type="number" value="0" /></div>
+
+          <div class="field"><label for="competitor_price">competitor_price</label><input id="competitor_price" type="number" step="0.01" value="1150" /></div>
+          <div class="field"><label for="inventory_level">inventory_level</label><input id="inventory_level" type="number" value="140" /></div>
+          <div class="field"><label for="customer_rating">customer_rating</label><input id="customer_rating" type="number" step="0.1" value="4.3" /></div>
+          <div class="field"><label for="seasonal_factor">seasonal_factor</label><input id="seasonal_factor" type="number" step="0.01" value="1.05" /></div>
+
+          <div class="field"><label for="avg_rating_given">avg_rating_given</label><input id="avg_rating_given" type="number" step="0.1" value="4.0" /></div>
+          <div class="field"><label for="browsing_time_min">browsing_time_min</label><input id="browsing_time_min" type="number" value="19" /></div>
+          <div class="field"><label for="items_in_cart">items_in_cart</label><input id="items_in_cart" type="number" value="3" /></div>
+          <div class="field"><label for="wishlist_items">wishlist_items</label><input id="wishlist_items" type="number" value="7" /></div>
+          <div class="field"><label for="clicked_ads">clicked_ads</label><input id="clicked_ads" type="number" value="2" /></div>
+
+          <div class="field"><label for="product_category">product_category</label><select id="product_category"><option>Electronics</option><option>Clothing</option><option>Home</option><option>Sports</option></select></div>
+          <div class="field"><label for="user_loyalty_tier">user_loyalty_tier</label><select id="user_loyalty_tier"><option>Silver</option><option>Gold</option><option>Platinum</option></select></div>
+          <div class="field"><label for="user_gender">user_gender</label><select id="user_gender"><option>M</option><option>F</option><option>Other</option></select></div>
+          <div class="field"><label for="season">season</label><select id="season"><option>Summer</option><option>Spring</option><option>Autumn</option><option>Winter</option></select></div>
+          <div class="field"><label for="purchase_history_category">purchase_history_category</label><select id="purchase_history_category"><option>Electronics</option><option>Clothing</option><option>Home &amp; Kitchen</option><option>Sports</option><option>Toys</option></select></div>
+          <div class="field"><label for="previous_category">previous_category</label><select id="previous_category"><option>Electronics</option><option>Clothing</option><option>Home &amp; Kitchen</option><option>Sports</option><option>Toys</option></select></div>
         </div>
 
-        <h2>Models</h2>
         <div class="checks">
-          <label class="check-item"><input type="checkbox" value="fraud" checked />Fraud</label>
-          <label class="check-item"><input type="checkbox" value="pricing" checked />Pricing</label>
-          <label class="check-item"><input type="checkbox" value="churn" checked />Churn</label>
-          <label class="check-item"><input type="checkbox" value="recommendation" checked />Recommendation</label>
+          <label class="check"><input type="checkbox" value="fraud" checked />fraud</label>
+          <label class="check"><input type="checkbox" value="churn" checked />churn</label>
+          <label class="check"><input type="checkbox" value="pricing" checked />pricing</label>
+          <label class="check"><input type="checkbox" value="recommendation" checked />recommendation</label>
         </div>
 
         <div class="actions">
-          <button class="btn-primary" id="runBtn">Run Execute</button>
-          <button class="btn-secondary" id="compareBtn">Run Comparison</button>
+          <button class="primary" id="runBtn">Run Engine</button>
+          <button class="secondary" id="resetBtn">Reset Node Colors</button>
         </div>
+        <div id="waveStatus">Idle</div>
       </section>
 
       <section class="panel">
-        <h2>Status</h2>
-        <p id="status" class="metric">Idle</p>
-
-        <h2>Execution Plan</h2>
-        <div id="waves" class="waves"></div>
-
-        <h2>Metrics</h2>
-        <div id="metrics"></div>
+        <h2>Dependency Graph (vis-network)</h2>
+        <div id="network"></div>
       </section>
     </div>
 
-    <section class="panel" style="margin-top: 18px;">
-      <h2>Results</h2>
-      <div id="results" class="results-grid"></div>
-    </section>
-
-    <section class="panel" style="margin-top: 18px;">
-      <h2>Feature Dependency Graph</h2>
-      <p class="sub" style="margin-bottom: 10px;">Raw inputs and derived features rendered from the backend graph endpoint.</p>
-      <div id="graph-wrap">
-        <div id="graph-controls">
-          <button id="zoomInBtn">＋ Zoom In</button>
-          <button id="zoomOutBtn">－ Zoom Out</button>
-          <button id="zoomResetBtn">↺ Reset</button>
-          <button id="fullscreenBtn">⛶ Fullscreen</button>
-        </div>
-        <div id="graph"></div>
-      </div>
-    </section>
+    <div class="bottom">
+      <section class="panel">
+        <h2>Execution Output</h2>
+        <div id="metrics"></div>
+        <h2 style="margin-top:10px;">Model Results</h2>
+        <pre id="results">Run Engine to see predictions.</pre>
+        <h2 style="margin-top:10px;">Wave Details</h2>
+        <pre id="waveDetails">-</pre>
+        <h2 style="margin-top:10px;">Partial Failures</h2>
+        <pre id="failures">None</pre>
+      </section>
+      <section class="panel">
+        <h2>Timing Chart</h2>
+        <canvas id="timingChart" height="240"></canvas>
+      </section>
+    </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script>
-    const statusEl = document.getElementById("status");
-    const wavesEl = document.getElementById("waves");
-    const metricsEl = document.getElementById("metrics");
-    const resultsEl = document.getElementById("results");
-    const graphEl = document.getElementById("graph");
     const apiBase = window.location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+    const waveStatusEl = document.getElementById("waveStatus");
+    const resultsEl = document.getElementById("results");
+    const waveDetailsEl = document.getElementById("waveDetails");
+    const failuresEl = document.getElementById("failures");
+    const metricsEl = document.getElementById("metrics");
 
-    mermaid.initialize({ startOnLoad: false, theme: "base" });
+    const COLOR_RAW = "#f2b263";
+    const COLOR_DERIVED = "#69a8dc";
+    const COLOR_RUNNING = "#f1d45c";
+    const COLOR_DONE = "#4fc180";
+    const COLOR_FAILED = "#e36b6b";
+
+    const nodeDataset = new vis.DataSet([]);
+    const edgeDataset = new vis.DataSet([]);
+    let network = null;
+    let timingChart = null;
 
     function selectedModels() {
-      return Array.from(document.querySelectorAll("input[type='checkbox']:checked")).map((el) => el.value);
+      return Array.from(document.querySelectorAll(".checks input:checked")).map((x) => x.value);
     }
 
     function readInputData() {
-      const txRaw = document.getElementById("transaction_history").value;
-      const tx = txRaw.split(",").map((v) => Number(v.trim())).filter((v) => !Number.isNaN(v));
+      const tx = document.getElementById("transaction_history").value
+        .split(",")
+        .map((x) => Number(x.trim()))
+        .filter((x) => !Number.isNaN(x));
+
       return {
         user_age: Number(document.getElementById("user_age").value),
         product_price: Number(document.getElementById("product_price").value),
         transaction_history: tx,
-        device_fingerprint: document.getElementById("device_fingerprint").value.trim(),
+        device_fingerprint: document.getElementById("device_fingerprint").value,
+
+        distance_from_home: Number(document.getElementById("distance_from_home").value),
+        previous_fraud_attempts: Number(document.getElementById("previous_fraud_attempts").value),
+        is_night_transaction: Number(document.getElementById("is_night_transaction").value),
+        card_present: Number(document.getElementById("card_present").value),
+        international_transaction: Number(document.getElementById("international_transaction").value),
+
+        tenure_months: Number(document.getElementById("tenure_months").value),
+        last_purchase_days: Number(document.getElementById("last_purchase_days").value),
+        support_tickets: Number(document.getElementById("support_tickets").value),
+        complaints: Number(document.getElementById("complaints").value),
+        discount_used: Number(document.getElementById("discount_used").value),
+        email_open_rate: Number(document.getElementById("email_open_rate").value),
+        app_visits_per_week: Number(document.getElementById("app_visits_per_week").value),
+        payment_delays: Number(document.getElementById("payment_delays").value),
+
+        competitor_price: Number(document.getElementById("competitor_price").value),
+        inventory_level: Number(document.getElementById("inventory_level").value),
+        customer_rating: Number(document.getElementById("customer_rating").value),
+        seasonal_factor: Number(document.getElementById("seasonal_factor").value),
+
+        avg_rating_given: Number(document.getElementById("avg_rating_given").value),
+        browsing_time_min: Number(document.getElementById("browsing_time_min").value),
+        items_in_cart: Number(document.getElementById("items_in_cart").value),
+        wishlist_items: Number(document.getElementById("wishlist_items").value),
+        clicked_ads: Number(document.getElementById("clicked_ads").value),
+
+        product_category: document.getElementById("product_category").value,
+        user_loyalty_tier: document.getElementById("user_loyalty_tier").value,
+        user_gender: document.getElementById("user_gender").value,
+        season: document.getElementById("season").value,
+        purchase_history_category: document.getElementById("purchase_history_category").value,
+        previous_category: document.getElementById("previous_category").value,
       };
     }
 
-    function renderResults(results) {
-      resultsEl.innerHTML = "";
-      Object.entries(results).forEach(([modelName, payload], idx) => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.style.animation = `rise 0.35s ease-out ${idx * 0.04}s both`;
-        card.innerHTML = `<h3>${modelName}</h3><pre>${JSON.stringify(payload, null, 2)}</pre>`;
-        resultsEl.appendChild(card);
-      });
-    }
-
-    function renderWaves(waves) {
-      wavesEl.innerHTML = "";
-      waves.forEach((wave, i) => {
-        const el = document.createElement("div");
-        el.className = "wave";
-        el.textContent = `Wave ${i + 1}: ${wave.join(", ")}`;
-        wavesEl.appendChild(el);
-      });
-    }
-
-    function renderMetrics(metrics, extra = {}) {
-      metricsEl.innerHTML = "";
-      const all = { ...metrics, ...extra };
-      Object.entries(all).forEach(([k, v]) => {
-        const div = document.createElement("div");
-        div.className = "metric";
-        div.textContent = `${k}: ${v}`;
-        metricsEl.appendChild(div);
-      });
-    }
-
-    async function callApi(path, payload) {
-      const response = await fetch(`${apiBase}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(detail || `HTTP ${response.status}`);
+    async function callApi(path, method = "GET", payload = null) {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (payload) opts.body = JSON.stringify(payload);
+      const res = await fetch(`${apiBase}${path}`, opts);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
       }
-      return response.json();
+      return res.json();
     }
 
-    let graphZoom = 1.0;
-    let svgNaturalW = 1400;
-    let svgNaturalH = 800;
-
-    function applyZoom() {
-      const svgEl = graphEl.querySelector("svg");
-      if (!svgEl) return;
-      // At zoom=1 fill the container width so height grows proportionally.
-      const containerW = graphEl.clientWidth - 32; // subtract padding
-      const baseW = Math.max(containerW, svgNaturalW);
-      const w = Math.round(baseW * graphZoom);
-      const h = Math.round(w * (svgNaturalH / svgNaturalW));
-      svgEl.setAttribute("width", w + "px");
-      svgEl.setAttribute("height", h + "px");
+    function baseColorForNode(node) {
+      return node.kind === "raw_input" ? COLOR_RAW : COLOR_DERIVED;
     }
 
-    document.getElementById("zoomInBtn").addEventListener("click", () => { graphZoom = Math.min(graphZoom + 0.25, 5); applyZoom(); });
-    document.getElementById("zoomOutBtn").addEventListener("click", () => { graphZoom = Math.max(graphZoom - 0.25, 0.25); applyZoom(); });
-    document.getElementById("zoomResetBtn").addEventListener("click", () => { graphZoom = 1.0; applyZoom(); });
-    document.getElementById("fullscreenBtn").addEventListener("click", () => {
-      const isFs = graphEl.classList.toggle("fullscreen");
-      document.getElementById("fullscreenBtn").textContent = isFs ? "✕ Exit Fullscreen" : "⛶ Fullscreen";
-    });
+    function resetNodeColors() {
+      nodeDataset.forEach((node) => {
+        nodeDataset.update({ id: node.id, color: { background: baseColorForNode(node), border: "#59606b" } });
+      });
+      waveStatusEl.textContent = "Idle";
+    }
 
-    async function renderDependencyGraph() {
-      try {
-        const response = await fetch(`${apiBase}/api/graph`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const graph = await response.json();
-        const graphId = `feature-graph-${Date.now()}`;
-        const { svg } = await mermaid.render(graphId, graph.mermaid);
-        graphEl.innerHTML = svg;
+    async function loadGraph() {
+      const graph = await callApi("/api/graph");
+      nodeDataset.clear();
+      edgeDataset.clear();
 
-        // Strip Mermaid's inline style="max-width:..." which overrides all CSS
-        const svgEl = graphEl.querySelector("svg");
-        if (svgEl) {
-          svgEl.removeAttribute("style");
-          // Read natural dimensions from viewBox so zoom is proportional
-          const vb = svgEl.getAttribute("viewBox");
-          if (vb) {
-            const parts = vb.trim().split(/[\s,]+/).map(Number);
-            if (parts.length === 4) {
-              svgNaturalW = parts[2] || 1400;
-              svgNaturalH = parts[3] || 800;
-            }
+      nodeDataset.add(
+        graph.nodes.map((n) => ({
+          id: n.id,
+          label: n.id,
+          shape: "box",
+          margin: 8,
+          widthConstraint: { minimum: 120 },
+          font: { face: "IBM Plex Mono", size: 12, bold: { size: 12 } },
+          color: { background: n.kind === "raw_input" ? COLOR_RAW : COLOR_DERIVED, border: "#59606b" },
+          kind: n.kind,
+        }))
+      );
+
+      edgeDataset.add(
+        graph.edges.map((e, idx) => ({ id: `${e.source}->${e.target}-${idx}`, from: e.source, to: e.target, arrows: "to" }))
+      );
+
+      if (!network) {
+        network = new vis.Network(
+          document.getElementById("network"),
+          { nodes: nodeDataset, edges: edgeDataset },
+          {
+            autoResize: true,
+            physics: { enabled: false },
+            layout: {
+              hierarchical: {
+                enabled: true,
+                direction: "LR",
+                sortMethod: "directed",
+                levelSeparation: 130,
+                nodeSpacing: 120,
+                treeSpacing: 160,
+                blockShifting: true,
+                edgeMinimization: true,
+                parentCentralization: true,
+              },
+            },
+            edges: {
+              smooth: false,
+              width: 1.4,
+              color: { color: "#6e6c73" },
+            },
+            interaction: {
+              hover: true,
+              navigationButtons: true,
+              keyboard: true,
+              zoomView: true,
+              dragView: true,
+            },
           }
-          // Start at 1× — fits node labels clearly; container scrolls for wide graphs
-          graphZoom = 1.0;
-          applyZoom();
-        }
-      } catch (err) {
-        graphEl.innerHTML = `<div class="metric error">Graph render failed: ${err.message}. Ensure FastAPI is running on http://127.0.0.1:8000.</div>`;
+        );
       }
+
+      if (network) {
+        network.fit({ animation: true });
+      }
+
+      resetNodeColors();
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    async function animateWaves(waves, partialFailures) {
+      for (let i = 0; i < waves.length; i += 1) {
+        const wave = waves[i];
+        waveStatusEl.textContent = `Executing Wave ${i}...`;
+
+        wave.forEach((feature) => {
+          if (nodeDataset.get(feature)) {
+            nodeDataset.update({ id: feature, color: { background: COLOR_RUNNING, border: "#4a4a4a" } });
+          }
+        });
+
+        await sleep(550);
+
+        wave.forEach((feature) => {
+          if (!nodeDataset.get(feature)) return;
+          const failed = Object.prototype.hasOwnProperty.call(partialFailures, feature);
+          nodeDataset.update({
+            id: feature,
+            color: { background: failed ? COLOR_FAILED : COLOR_DONE, border: "#4a4a4a" },
+          });
+        });
+
+        await sleep(320);
+      }
+      waveStatusEl.textContent = `Completed ${waves.length} waves.`;
+    }
+
+    function renderChart(engineTimeMs, sequentialTimeMs) {
+      const ctx = document.getElementById("timingChart");
+      if (timingChart) timingChart.destroy();
+
+      timingChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["Engine", "Sequential"],
+          datasets: [{
+            data: [engineTimeMs, sequentialTimeMs],
+            backgroundColor: ["#69a8dc", "#dd623c"],
+            borderRadius: 8,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: "ms" } },
+          },
+        },
+      });
+    }
+
+    function renderResponse(data) {
+      resultsEl.textContent = JSON.stringify(data.results, null, 2);
+      waveDetailsEl.textContent = data.execution_plan.waves
+        .map((wave, idx) => `Wave ${idx}: ${wave.join(", ")}`)
+        .join("\n\n");
+      failuresEl.textContent = Object.keys(data.partial_failures || {}).length
+        ? JSON.stringify(data.partial_failures, null, 2)
+        : "None";
+
+      const m = data.metrics;
+      metricsEl.innerHTML = `
+        <div class="metric">engine_time_ms: ${m.engine_time_ms}</div>
+        <div class="metric">sequential_time_ms: ${m.sequential_time_ms}</div>
+        <div class="metric">speedup_factor: ${m.speedup_factor}</div>
+        <div class="metric">features_reused: ${data.execution_plan.features_reused}</div>
+        <div class="metric">features_saved_from_recompute: ${m.features_saved_from_recompute}</div>
+        <div class="metric">cache_hits: ${data.observability.cache_hits}</div>
+        <div class="metric">cache_misses: ${data.observability.cache_misses}</div>
+        <div class="metric">fastest_feature: ${data.observability.fastest_feature || "-"}</div>
+        <div class="metric">slowest_feature: ${data.observability.slowest_feature || "-"}</div>
+      `;
+
+      renderChart(m.engine_time_ms, m.sequential_time_ms);
     }
 
     document.getElementById("runBtn").addEventListener("click", async () => {
       try {
-        statusEl.className = "metric";
-        statusEl.textContent = "Running /api/execute...";
+        waveStatusEl.textContent = "Calling /api/execute...";
+        resetNodeColors();
         const payload = { models: selectedModels(), input_data: readInputData() };
-        const data = await callApi("/api/execute", payload);
-        renderResults(data.results);
-        renderWaves(data.execution_plan.waves);
-        renderMetrics(data.metrics, {
-          total_features_computed: data.execution_plan.total_features_computed,
-          features_reused: data.execution_plan.features_reused,
-        });
-        statusEl.className = "metric ok";
-        statusEl.textContent = "Execution completed";
+        const data = await callApi("/api/execute", "POST", payload);
+        renderResponse(data);
+        await animateWaves(data.execution_plan.waves, data.partial_failures || {});
       } catch (err) {
-        statusEl.className = "metric error";
-        statusEl.textContent = `Error: ${err.message}`;
+        waveStatusEl.textContent = `Error: ${err.message}`;
       }
     });
 
-    document.getElementById("compareBtn").addEventListener("click", async () => {
-      try {
-        statusEl.className = "metric";
-        statusEl.textContent = "Running /api/comparison...";
-        const payload = { models: selectedModels(), input_data: readInputData() };
-        const data = await callApi("/api/comparison", payload);
-        renderResults(data.engine_results);
-        renderWaves([]);
-        renderMetrics({
-          engine_time_ms: data.engine_time_ms,
-          sequential_time_ms: data.sequential_time_ms,
-          speedup_factor: data.speedup_factor,
-        });
-        statusEl.className = "metric ok";
-        statusEl.textContent = "Comparison completed";
-      } catch (err) {
-        statusEl.className = "metric error";
-        statusEl.textContent = `Error: ${err.message}`;
-      }
-    });
+    document.getElementById("resetBtn").addEventListener("click", resetNodeColors);
 
-    renderDependencyGraph();
+    loadGraph().catch((err) => {
+      waveStatusEl.textContent = `Graph load failed: ${err.message}`;
+    });
   </script>
 </body>
 </html>
