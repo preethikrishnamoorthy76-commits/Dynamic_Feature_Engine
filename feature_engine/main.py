@@ -25,11 +25,19 @@ def _parse_args() -> argparse.Namespace:
         "--models",
         nargs="+",
         required=True,
-        help="One or more model IDs (fraud pricing churn recommendation)",
+        help="One or more model IDs (fraud pricing churn recommendation) or 'ALL'",
     )
     parser.add_argument("--fail", nargs="*", default=[], help="Optional feature IDs to force-fail")
     parser.add_argument("--verbose", action="store_true", help="Enable structured execution logs")
+    parser.add_argument("--plan-only", action="store_true", help="Show plan without executing")
     return parser.parse_args()
+
+
+def _resolve_models(model_args: List[str]) -> List[str]:
+    """Convert 'ALL' to list of all models, or return the provided list."""
+    if len(model_args) == 1 and model_args[0].upper() == "ALL":
+        return list(PROJECT_MODELS.keys())
+    return model_args
 
 
 def _default_input_data() -> Dict[str, Any]:
@@ -98,6 +106,9 @@ def _print_summary(events: List[Dict[str, Any]]) -> None:
 
 def main() -> None:
     args = _parse_args()
+    
+    # Resolve model list
+    model_ids = _resolve_models(args.models)
 
     engine = FeatureExecutionEngine(
         features=PROJECT_FEATURES,
@@ -105,8 +116,22 @@ def main() -> None:
         compute_functions=PROJECT_COMPUTE_FUNCTIONS,
         verbose=args.verbose,
     )
+    
+    # Show plan
+    print(f"\n{'='*70}")
+    print("EXECUTION PLAN")
+    print(f"{'='*70}")
+    print(f"Models:        {', '.join(model_ids)}")
+    print(f"Failures:      {args.fail if args.fail else 'None'}")
+    print(f"Verbose:       {args.verbose}")
+    print(f"{'='*70}\n")
+    
+    if args.plan_only:
+        print("[--plan-only flag set] Stopping after plan display.")
+        return
+    
     output = engine.run(
-        model_ids=args.models,
+        model_ids=model_ids,
         input_data=_default_input_data(),
         fail_features=set(args.fail),
     )
